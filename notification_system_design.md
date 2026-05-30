@@ -1,64 +1,84 @@
-# Notification System Design
+# Campus Notifications Microservice — System Design
+Roll Number: 2300032669
+Name: SURUBHOTLA SRI RAM SAKETH
 
-## Stage 1
+Stage 1 — REST API Design
 
-**API Endpoints:**
+The notification system allows students to receive updates about Placements, Results, and Events.
 
-- GET /notifications - get all notifications for a student
-- GET /notifications/unread - get only unread notifications  
-- PUT /notifications/{id}/read - mark one notification as read
-- GET /notifications/count - get number of unread notifications
+Endpoints I designed:
 
-**Real-time:** I will use WebSocket. When a new notification comes, server pushes it directly to student's browser.
+GET /api/notifications - Fetch notifications for a student with pagination
+POST /api/notifications - Admin creates and sends notification
+PUT /api/notifications/:id/read - Mark notification as read
+GET /api/notifications/priority-inbox - Get top n unread notifications
 
-**Response format:**
-{
-  "id": "abc-123",
-  "type": "Placement",
-  "message": "Amazon hiring",
-  "isRead": false,
-  "createdAt": "2026-05-30 12:00:00"
-}
+Real-Time Mechanism: I used Server-Sent Events (SSE) because notifications are one-way from server to client. WebSockets are overkill.
 
-## Stage 2
+Stage 2 — Database Design
 
-I will use PostgreSQL because it is reliable for this type of data.
+I chose PostgreSQL because data has fixed structure.
 
-**Tables:**
-students (id, name, roll_no, email)
-notifications (id, student_id, type, message, is_read, created_at)
+Tables:
+- students: id, roll_no, name, email
+- notifications: id, student_id, type, message, is_read, created_at
 
-When data grows large, I will add indexes and partition by date.
+SQL Query Example:
+SELECT id, type, message FROM notifications WHERE student_id = 2300032669 AND is_read = false ORDER BY created_at DESC LIMIT 10;
 
-## Stage 3
+Stage 3 — Query Optimization
 
-The query is slow because there is no index. Database scans all rows.
+The query is slow because there is no index on student_id and is_read.
 
-**Fix:** Add index on (student_id, is_read, created_at)
+Fix: CREATE INDEX idx_student_read ON notifications(student_id, is_read, created_at DESC);
 
-**Query for placement notifications in last 7 days:**
+Indexing every column is bad because it slows down writes.
+
+Query for placement notifications last 7 days:
 SELECT DISTINCT s.* FROM students s JOIN notifications n ON s.id = n.student_id WHERE n.type = 'Placement' AND n.created_at >= NOW() - INTERVAL '7 days';
 
-## Stage 4
+Stage 4 — Performance
 
-I will use Redis cache to store unread notifications for 1 minute. This reduces DB load. Pagination also helps - load only 20 at a time.
+Problems: DB gets overwhelmed with repeated queries.
 
-## Stage 5
+Solutions:
+1. Redis cache with 2 minute TTL
+2. Pagination - load 20 at a time
+3. Connection pooling
 
-The problem is if email fails for 200 students, everything stops. I will use a message queue. Save to DB first, then send emails asynchronously with retry for failures.
+Stage 5 — Fault Tolerance
 
-## Stage 6
+Problems: No error handling, one failure stops everything, email and DB together.
 
-**Priority formula:** Placement(3) > Result(2) > Event(1) + recency (newer = higher)
+Should email and DB happen together? No. Save to DB first, then send email separately.
 
-**Code to find top 10:**
+Redesigned code:
+for each student in students:
+    try:
+        save_to_db(student)
+        push_to_app(student)
+    catch error:
+        log_error(student)
+    try:
+        send_email(student)
+    catch error:
+        retry_queue.push(student)
+
+Stage 6 — Priority Inbox
+
+Priority formula: Placement(3) > Result(2) > Event(1) and newer notifications come first.
+
+Java code:
 public List<Notification> getTop10(List<Notification> list) {
     list.sort((a,b) -> {
-        int scoreA = getWeight(a.type) - daysSince(a.timestamp);
-        int scoreB = getWeight(b.type) - daysSince(b.timestamp);
+        int scoreA = getWeight(a.type);
+        int scoreB = getWeight(b.type);
+        if(scoreA == scoreB) {
+            return b.timestamp.compareTo(a.timestamp);
+        }
         return scoreB - scoreA;
     });
     return list.subList(0, Math.min(10, list.size()));
 }
 
-To maintain top 10 efficiently, use min-heap.
+To maintain top 10 efficiently, use Min-Heap of size 10.
