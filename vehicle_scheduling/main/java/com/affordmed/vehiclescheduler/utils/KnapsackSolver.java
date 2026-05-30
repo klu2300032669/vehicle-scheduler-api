@@ -8,8 +8,7 @@ public class KnapsackSolver {
     public static List<Vehicle> solve(List<Vehicle> vehicles, int maxHours) {
         int n = vehicles.size();
         int[][] dp = new int[n + 1][maxHours + 1];
-        
-        // Fill DP table
+       
         for (int i = 1; i <= n; i++) {
             Vehicle v = vehicles.get(i - 1);
             for (int w = 0; w <= maxHours; w++) {
@@ -21,8 +20,7 @@ public class KnapsackSolver {
                 }
             }
         }
-        
-        // Find selected vehicles
+
         List<Vehicle> selected = new ArrayList<>();
         int w = maxHours;
         for (int i = n; i > 0 && w > 0; i--) {
