@@ -30,7 +30,7 @@ public class VehicleSchedulerService {
         Map<String, Object> result = new HashMap<>();
         
         try {
-            // Fetch depots
+            
             List<Depot> depots = fetchDepots();
             System.out.println("Depots received: " + depots.size());
             
@@ -41,8 +41,7 @@ public class VehicleSchedulerService {
                 result.put("budget", 0);
                 return result;
             }
-            
-            // Fetch vehicles
+          
             List<Vehicle> vehicles = fetchVehicles();
             System.out.println("Vehicles received: " + vehicles.size());
             
@@ -53,16 +52,14 @@ public class VehicleSchedulerService {
                 result.put("budget", 0);
                 return result;
             }
-            
-            // Use first depot
+         
             int budget = depots.get(0).getMechanicHours();
             int depotId = depots.get(0).getId();
             
             System.out.println("\n=== Solving Knapsack Problem ===");
             System.out.println("Budget: " + budget + " hours");
             System.out.println("Total Vehicles: " + vehicles.size());
-            
-            // Solve knapsack
+       
             long startTime = System.currentTimeMillis();
             List<Vehicle> selected = KnapsackSolver.solve(vehicles, budget);
             long endTime = System.currentTimeMillis();
@@ -117,7 +114,7 @@ public class VehicleSchedulerService {
                 List<Map<String, Object>> depotsList = (List<Map<String, Object>>) responseBody.get("depots");
                 for (Map<String, Object> depotMap : depotsList) {
                     Depot depot = new Depot();
-                    // Note: API uses uppercase "ID" and "MechanicHours"
+                   
                     if (depotMap.containsKey("ID")) {
                         depot.setId((Integer) depotMap.get("ID"));
                     }
